@@ -29,7 +29,7 @@ const SimpleHashTable = require('simple-hashtable');
 var stdin = process.openStdin();
 //ws is a popular WebSockets library for Node. js. We'll use it to build a WebSockets server. 
 //It can also be used to implement a client, and use WebSockets to communicate between two backend services.
-var ws = require('ws');
+//var ws = require('ws');
 
 //Create a hastable to store blocked URLs for ease of searching
 var blockedurls = new SimpleHashTable();
