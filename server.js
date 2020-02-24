@@ -5,9 +5,10 @@ const http = require("http");
 const https = require('https');
 const url = require('url');
 const SimpleHashTable = require('simple-hashtable');
+var cache = require( "node-cache" );
 
 //Handle Server Response
-function handleResponse(url, handle_res, res, blockedurls){
+function handleResponse(url, handle_res, res, blockedurls,serverCache){
 
     // Check if URL is blocked
     if ( blockedurls.containsKey(url) ) {
@@ -30,92 +31,102 @@ function handleResponse(url, handle_res, res, blockedurls){
       return;
     }
 
-    handle_res.setEncoding('utf8');
-    var rawData = '';
+    var hit = false;
+    // Check cache for web page and verify expires
+    try {
+    cacheRes = serverCache.get(url) 
+        if (cacheRes == undefined) {
+            console.log("URL not in Cache");
+        } else {
+            res.write(cacheRes.body);
+            res.end();
+            console.log("Valid Cache");
+            hit = true;
+        }
+    } catch {
+        console.log("request cache get error");
+    }
 
-    //At the stage when data is recieved
-    handle_res.on('data', (chunk) => {
-        rawData += chunk;
-        console.log("Received chunk of size " + chunk.length + " characters, " + Buffer.byteLength(chunk, 'utf8') + " bytes");
-    });
+    if (!hit) {
+        //encoding
+        handle_res.setEncoding('utf8');
+        var rawData = '';
 
-    //At the end of the response
-    handle_res.on('end', () => {
-        res.write(rawData);
-        res.end();
-    });
+        //At the stage when data is recieved
+        handle_res.on('data', (chunk) => {
+            rawData += chunk;
+        });
+    
+        //At the end of the response
+        handle_res.on('end', () => {
+
+            //Make cache object to store in cache
+            cacheObject = {
+                body: rawData
+            }
+
+            //store cache object in the cache
+            serverCache.set(url, cacheObject, (err, success) => {
+                if (!err && success) {
+                    console.log("URL added to cache");
+                } else {
+                    console.log("URL not added to cache");
+                }
+            });
+
+            res.write(rawData);
+            res.end();
+        });
+    }
+   
 }
 
 
 module.exports = {
-    onRequest: function(req, res, blockedurls) {
-        {
-
-            //Read the Query String
-            //res.write(req.url);
-            //res.write('Hello World!'); //write a response to the client
+    onRequest: function(req, res, blockedurls,serverCache) {
         
             var split = url.parse(req.url.substring(1), false);
-        
-            //res.write(split.protocol);  //  https:
-            //res.write(split.path);      //  /
-            //res.write(split.hostname);  //  www.tcd.ie
-            //res.write(split.href);    //  https://www.tcd.ie/
-            //res.end(); //end the response
-        
-            var proxy_req;
-        
-            // Handle http and https request seperately
-            console.log('\nReceived request for: ' + split.protocol + '//'+ split.hostname);
-            if( split.protocol == 'http:' ) {
-        
-                /*
-                http.get(options[, callback])
-                http.get(url[, options][, callback])
-        
-                url <string> | <URL>
-                options <Object> Accepts the same options as http.request(), with the method always set to GET. Properties that are inherited from the prototype are ignored.
-                callback <Function>
-                Returns: <http.ClientRequest>
-                Since most requests are GET requests without bodies, Node.js provides this convenience method. 
-                The only difference between this method and http.request() is that it sets the method to GET and calls req.end() automatically. 
-                The callback must take care to consume the response data for reasons stated in http.ClientRequest section.
-        
-                The callback is invoked with a single argument that is an instance of http.IncomingMessage.
-                */
-                
-               proxy_req = http.get(split.href, (response) => handleResponse(split.hostname, response, res, blockedurls))
-                .on('error', (e) => {
-                    console.error(`Got error: ${e.message}`);
-                });
-        
-            } else if (split.protocol == 'https:') {
-        
-                /*
-                https.get(options[, callback])
-                https.get(url[, options][, callback])
-        
-                url <string> | <URL>
-                options <Object> | <string> | <URL> Accepts the same options as https.request(), with the method always set to GET.
-                callback <Function>
-        
-                options can be an object, a string, or a URL object. 
-                If options is a string, it is automatically parsed with new URL(). 
-                If it is a URL object, it will be automatically converted to an ordinary options object.
-                */
-                proxy_req = https.get(split.href, (response) => handleResponse(split.hostname,response, res,blockedurls))
-                .on('error', (e) => {
-                    console.error(`Got error: ${e.message}`);
-                });
-                
-            } else {
-        
-                res.write('Invalid request');
-                res.end();
-        
-            }
-        
+            if (split.protocol!=null) {
+                //res.write(split.protocol);  //  https:
+                //res.write(split.path);      //  /
+                //res.write(split.hostname);  //  www.tcd.ie
+                //res.write(split.href);    //  https://www.tcd.ie/
+                //res.end(); //end the response
+            
+                // Handle http and https request seperately
+                console.log('\nReceived request for: ' + split.protocol + '//'+ split.hostname);
+                if( split.protocol == 'http:' ) {
+    
+                    http.get(split.href, (response) => handleResponse(split.hostname, response, res, blockedurls,serverCache))
+                    .on('error', (e) => {
+                        console.error(`Got error: ${e.message}`);
+                    })
+                    .on('timeout', () => {
+                        console.log('Request timeout');
+                        res.end();
+                        request.abort();
+                    });
+            
+                } else if (split.protocol == 'https:') {
+    
+                    https.get(split.href, (response) => handleResponse(split.hostname,response, res,blockedurls,serverCache))
+                    .on('error', (e) => {
+                        console.error(`error: ${e.message}`);
+                    })
+                    .on('timeout', () => {
+                        console.log('Request timeout');
+                        res.end();
+                        request.abort();
+                    });
+                    
+                } else {
+            
+                    res.write('Invalid request');
+                    res.end();
+            
+                }
         }  
-    }
+        
+    } 
 }
 

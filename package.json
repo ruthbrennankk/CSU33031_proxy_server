@@ -18,6 +18,7 @@
   "homepage": "https://github.com/ruthbrennankk/CSU33031_proxy_server#readme",
   "dependencies": {
     "express": "^4.17.1",
+    "node-cache": "^5.1.0",
     "simple-hashtable": "^1.0.0",
     "valid-url": "^1.0.9",
     "websocket": "^1.0.31",

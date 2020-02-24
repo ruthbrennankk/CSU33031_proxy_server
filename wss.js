@@ -13,7 +13,7 @@ const url = require('url');
 const SimpleHashTable = require('simple-hashtable');
 
 // Handle WebSocket responses
-function handleWebSocketResponse(url, res, ws, blockedurls) {
+function handleWebSocketResponse(url, res, ws, blockedurls,serverCache) {
 
     // Check if URL is blocked
     if(blockedurls.containsKey(url)){
@@ -35,45 +35,86 @@ function handleWebSocketResponse(url, res, ws, blockedurls) {
         return;
     }
 
-    res.setEncoding('utf8');
-    var rawData = '';
+    var hit = false;
+    // Check cache for web page and verify expires
+    try {
+        cacheRes = serverCache.get(url) 
+        if (cacheRes == undefined) {
+            console.log("URL not in Cache");
+        } else {
+            ws.send(cacheRes.body);
+            console.log("Valid Cache");
+            hit = true;
+        }
+    } catch {
+        console.log("request cache get error");
+    }
 
-    //At the stage when data is recieved
-    res.on('data', (chunk) => { 
-        rawData += chunk;
-    });
+    if (!hit) {
+        //encoding
+        res.setEncoding('utf8');
+        var rawData = '';
 
-    //At the stage when connection is closed
-    res.on('error', () => {
-        console.log("Recieved Error");
-    });
+        //At the stage when data is recieved
+        res.on('data', (chunk) => {
+            rawData += chunk;
+        });
+    
+        //At the end of the response
+        res.on('end', () => {
 
-    //At the stage when connection is closed
-    res.on('end', () => {
-        ws.send(rawData);
-    });
+            //Make cache object to store in cache
+            cacheObject = {
+                body: rawData
+            }
+
+            //store cache object in the cache
+            serverCache.set(url, cacheObject, (err, success) => {
+                if (!err && success) {
+                    console.log("URL added to cache");
+                } else {
+                    console.log("URL not added to cache");
+                }
+            });
+
+            ws.send(rawData);
+            console.log("success");
+        });
+    }
 }
+
+
+
 
 module.exports = {
 
     // Handle WebSocket requests
-    handleWebSocketRequest: function(URL, ws, blockedurls) {
+    handleWebSocketRequest: function(URL, ws, blockedurls, serverCache) {
         var split = url.parse(URL, true);
 
         // Handle http and https request seperately
         console.log('\nReceived request for: ' + split.protocol + '//'+ split.hostname);
         if( split.protocol == 'http:' ) {
             
-            http.get(split.href, (response) => handleWebSocketResponse(split.hostname, response, ws, blockedurls))
+            http.get(split.href, (response) => handleWebSocketResponse(split.hostname, response, ws, blockedurls, serverCache))
             .on('error', (e) => {
                 console.error(`Got error: ${e.message}`);
+            })
+            .on('timeout', () => {
+                console.log('Request timeout');
+                res.end();
+                request.abort();
             });
-    
         } else if (split.protocol == 'https:') {
     
-            https.get(split.href, (response) => handleWebSocketResponse(split.hostname, response, ws, blockedurls))
+            https.get(split.href, (response) => handleWebSocketResponse(split.hostname, response, ws, blockedurls, serverCache))
             .on('error', (e) => {
                 console.error(`Got error: ${e.message}`);
+            })
+            .on('timeout', () => {
+                console.log('Request timeout');
+                res.end();
+                request.abort();
             });
             
         } else {

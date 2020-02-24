@@ -4,29 +4,28 @@ const port = 8000;
 var stdin = process.openStdin();
 var validUrl = require('valid-url');
 
-// Console input listener, block URLs here
+// Console input listener
 stdin.addListener("data", function(data) {
 
-    // Extract command (block, unblock, printBlocked, printCache)
+    // Listens to the console
+    //Enter request followed by url
     var input = data.toString();
     var command = input.substring(0, input.indexOf(' '));
 
-    switch(command){
-      // Handle the dynamic blocking of URLs
-      case "request":
-        var urlToRequest = data.toString().substring(8).trim();
+    if (command == "request") {
 
-        if(validUrl.isUri(urlToRequest)){
-          console.log("Valid URI - Sending request to proxy...");
-          ws.send(urlToRequest);
-        } else {
-          console.log("Invalid URL - " + urlToRequest + "\n");
-        }
-        break;
+      var url = data.toString().substring(8).trim();
+      if(validUrl.isUri(url)){
+        console.log("URL OK, sending proxy request");
+        ws.send(url);
+      } else {
+        console.log("Invalid URL");
+      }
 
-      default:
-        console.log("Unknown command - " + command);
-        break;
+    } else {
+
+      console.log("Unknown command");
+      
     }
 });
 
@@ -34,13 +33,13 @@ stdin.addListener("data", function(data) {
 const ws = new WebSocket('ws://' + hostname + ':' + port);
 
 ws.on('open', function open() {
-  console.log("Successful WebSocket connection to proxy via ws://localhost:8000");
+  console.log("Successful connection to proxy");
 });
 
-ws.on('message', function incoming(message) {
-    console.log('Received response from proxy: %s', message);
+ws.on('message', function incoming(mes) {
+    console.log('Received response from proxy: %s', mes);
 });
 
 ws.on('close', function closed() {
-  console.log("WebSocket connection to proxy was closed");
+  console.log("Proxy connection closed");
 })
