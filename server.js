@@ -6,6 +6,7 @@ const https = require('https');
 const url = require('url');
 const SimpleHashTable = require('simple-hashtable');
 var cache = require( "node-cache" );
+const { PerformanceObserver, performance } = require('perf_hooks');
 
 //Handle Server Response
 function handleResponse(url, handle_res, res, blockedurls,serverCache){
@@ -31,6 +32,9 @@ function handleResponse(url, handle_res, res, blockedurls,serverCache){
       return;
     }
 
+    var start = performance.now();
+    console.log("start "+start);
+
     var hit = false;
     // Check cache for web page and verify expires
     try {
@@ -42,6 +46,8 @@ function handleResponse(url, handle_res, res, blockedurls,serverCache){
             res.end();
             console.log("Valid Cache");
             hit = true;
+            var validEnd = performance.now();
+            console.log("valid end " + validEnd);  
         }
     } catch {
         console.log("request cache get error");
@@ -56,6 +62,7 @@ function handleResponse(url, handle_res, res, blockedurls,serverCache){
         handle_res.on('data', (chunk) => {
             rawData += chunk;
         });
+
     
         //At the end of the response
         handle_res.on('end', () => {
@@ -76,6 +83,8 @@ function handleResponse(url, handle_res, res, blockedurls,serverCache){
 
             res.write(rawData);
             res.end();
+            var missEnd = performance.now();
+            console.log("miss end " + missEnd);  
         });
     }
    
@@ -84,7 +93,7 @@ function handleResponse(url, handle_res, res, blockedurls,serverCache){
 
 module.exports = {
     onRequest: function(req, res, blockedurls,serverCache) {
-        
+
             var split = url.parse(req.url.substring(1), false);
             if (split.protocol!=null) {
                 //res.write(split.protocol);  //  https:

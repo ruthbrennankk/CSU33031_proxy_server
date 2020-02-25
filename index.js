@@ -22,6 +22,8 @@ const port = 8000;
 const SimpleHashTable = require('simple-hashtable');
 const stdin = process.openStdin();
 var cache = require( "node-cache" );
+const { PerformanceObserver, performance } = require('perf_hooks');
+
 
 const handle_wss = require('./wss.js');
 const handle_server = require('./server.js');
@@ -43,15 +45,16 @@ var blockedurls = new SimpleHashTable();
 blockedurls.put('www.google.com', 'blocked');
 
 //SERVER STUFF
-
 //create a server object:
 var server = http.createServer(onRequest).listen(port,() => {
     console.log(`Server running at http://${hostname}:${port}/`);
   }); //the server object listens on port
 
 function onRequest(req,res) {
+
     handle_server.onRequest(req,res,blockedurls,serverCache);
 }
+
 
 //WEBSOCKET STUFF
 
@@ -65,6 +68,7 @@ wss.on('connection', function connection(ws) {
 
   ws.on('message', function incoming(message) {
     console.log('Received WebSocket request for: %s', message);
+
     handle_wss.handleWebSocketRequest(message, ws, blockedurls, serverCache);
   });
 

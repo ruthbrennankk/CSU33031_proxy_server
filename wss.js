@@ -11,6 +11,7 @@ const http = require("http");
 const https = require('https');
 const url = require('url');
 const SimpleHashTable = require('simple-hashtable');
+const { PerformanceObserver, performance } = require('perf_hooks');
 
 // Handle WebSocket responses
 function handleWebSocketResponse(url, res, ws, blockedurls,serverCache) {
